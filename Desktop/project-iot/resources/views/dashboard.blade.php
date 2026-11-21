@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Fashion Inventory System</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -39,7 +40,8 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         <!-- Stat Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div id="live-stats" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
             <!-- Total Produksi -->
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
                 <div>
@@ -48,7 +50,9 @@
                     <p class="text-xs font-bold text-slate-400 mt-1">Item terdeteksi IR Sensor</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-indigo-400 rounded-xl border-2 border-amber-100">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
                 </div>
             </div>
 
@@ -60,7 +64,9 @@
                     <p class="text-xs font-bold text-slate-400 mt-1">Siap disalurkan di rak</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-emerald-400 rounded-xl border-2 border-amber-100">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                    </svg>
                 </div>
             </div>
 
@@ -72,7 +78,9 @@
                     <p class="text-xs font-bold text-slate-400 mt-1">Keluar dari gudang</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-amber-400 rounded-xl border-2 border-amber-100">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                    </svg>
                 </div>
             </div>
         </div>
@@ -82,19 +90,46 @@
 
             <!-- QR Code Box -->
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center">
-                <h2 class="text-xs font-black text-amber-100 uppercase tracking-wider mb-4">QR Code Produk Unique</h2>
-                <div class="p-4 bg-white rounded-2xl border-4 border-amber-200 shadow-inner">
-                    @if(isset($product) && $product->qr_code_path)
-                        <img src="{{ str_starts_with($product->qr_code_path, 'http') ? $product->qr_code_path : asset('storage/' . $product->qr_code_path) }}" alt="QR Code" class="w-44 h-44 object-contain">
-                    @else
-                        <div class="w-44 h-44 bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold rounded-xl border-2 border-dashed border-slate-400">
-                            Menunggu Data ESP32...
-                        </div>
-                    @endif
+                <h2 class="text-xs font-black text-amber-100 uppercase tracking-wider mb-3">QR Code Produk Unique</h2>
+
+                <!-- Pilihan Warna Baju -->
+                <div class="flex flex-wrap justify-center gap-1.5 mb-4">
+                    <button type="button" onclick="setWarnaBaju('PNK', '#F472B6')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-pink-400 text-pink-400 hover:bg-pink-400/10 transition cursor-pointer">
+                        Pink (PNK)
+                    </button>
+                    <button type="button" onclick="setWarnaBaju('HJU', '#39FF14')" style="border-color: #39FF14; color: #39FF14;" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 hover:bg-[#39FF14]/10 transition cursor-pointer">
+                        Ijo Neon (HJU)
+                    </button>
+                    <button type="button" onclick="setWarnaBaju('MRH', '#F87171')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-red-400 text-red-400 hover:bg-red-400/10 transition cursor-pointer">
+                        Merah (MRH)
+                    </button>
+                    <button type="button" onclick="setWarnaBaju('HTM', '#94A3B8')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-slate-400 text-slate-300 hover:bg-slate-400/10 transition cursor-pointer">
+                        Hitam (HTM)
+                    </button>
+                    <button type="button" onclick="setWarnaBaju('PTH', '#F8FAFC')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-white text-white hover:bg-white/10 transition cursor-pointer">
+                        Putih (PTH)
+                    </button>
                 </div>
-                <p class="mt-4 text-xs font-mono text-slate-200 bg-slate-950 px-4 py-2 rounded-xl border-2 border-amber-100 font-bold">
-                    SKU: <span class="text-indigo-400 font-black">{{ $product->sku ?? 'N/A' }}</span>
+
+                <!-- Area Label QR -->
+                <div id="area-label-qr" style="border-color: #F472B6;" class="p-4 bg-white rounded-2xl border-4 shadow-inner transition-colors duration-200 flex items-center justify-center">
+                    <div id="qrcode-canvas" class="w-44 h-44 flex items-center justify-center"></div>
+                </div>
+
+                <!-- Badge SKU -->
+                <p id="badge-sku-box" style="border-color: #F472B6;" class="mt-4 text-xs font-mono text-slate-200 bg-slate-950 px-5 py-2 rounded-xl border-2 font-bold transition-colors duration-200">
+                    SKU: <span id="sku-text" style="color: #F472B6;" class="font-black">PNK-001</span>
                 </p>
+
+                <!-- Tombol Download QR -->
+                <div class="mt-4 w-full">
+                    <button type="button" onclick="downloadQR()" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-sky-400 text-slate-950 hover:bg-sky-300 transition shadow-md cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Download QR
+                    </button>
+                </div>
             </div>
 
             <!-- Table Riwayat -->
@@ -114,7 +149,7 @@
                                     <th class="py-3.5 px-4 text-right">Kecepatan PID (RPM)</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y-2 divide-slate-800 font-bold">
+                            <tbody id="live-table" class="divide-y-2 divide-slate-800 font-bold">
                                 @forelse($logs as $log)
                                     <tr class="hover:bg-slate-800/80 transition-colors">
                                         <td class="py-3.5 px-4 font-mono text-xs text-slate-300 border-r-2 border-slate-800">
@@ -153,6 +188,139 @@
 
         </div>
     </main>
+
+    <!-- Script Pengatur Warna SKU, Download QR & Auto-Sync Data -->
+    <script>
+        let urutanWarna = {
+            PNK: 2,
+            HJU: 1,
+            MRH: 1,
+            HTM: 1,
+            PTH: 1
+        };
+
+        let hexSaatIni = '#F472B6';
+        let skuAktif = 'PNK-001';
+
+        function renderQRCode(teksSku) {
+            const container = document.getElementById('qrcode-canvas');
+            container.innerHTML = '';
+
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(container, {
+                    text: teksSku,
+                    width: 176,
+                    height: 176,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } else {
+                const img = document.createElement('img');
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(teksSku)}`;
+                img.className = 'w-44 h-44 object-contain';
+                container.appendChild(img);
+            }
+        }
+
+        // Langsung tampilkan PNK-001 & QR-nya saat halaman dibuka
+        window.addEventListener('load', function() {
+            renderQRCode(skuAktif);
+        });
+
+        function setWarnaBaju(kode, hex) {
+            hexSaatIni = hex;
+
+            let nomor = String(urutanWarna[kode]).padStart(3, '0');
+            skuAktif = `${kode}-${nomor}`;
+
+            document.getElementById('area-label-qr').style.borderColor = hex;
+            document.getElementById('badge-sku-box').style.borderColor = hex;
+
+            const skuText = document.getElementById('sku-text');
+            skuText.style.color = hex;
+            skuText.innerText = skuAktif;
+
+            renderQRCode(skuAktif);
+            urutanWarna[kode]++;
+        }
+
+        async function downloadQR() {
+            const qrContainer = document.getElementById('qrcode-canvas');
+            const sourceCanvas = qrContainer.querySelector('canvas');
+            const sourceImg = qrContainer.querySelector('img');
+
+            const finalCanvas = document.createElement('canvas');
+            const ctx = finalCanvas.getContext('2d');
+
+            finalCanvas.width = 260;
+            finalCanvas.height = 300;
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+            ctx.strokeStyle = hexSaatIni;
+            ctx.lineWidth = 8;
+            ctx.strokeRect(4, 4, finalCanvas.width - 8, finalCanvas.height - 8);
+
+            if (sourceCanvas) {
+                ctx.drawImage(sourceCanvas, 42, 24, 176, 176);
+            } else if (sourceImg) {
+                try {
+                    const res = await fetch(sourceImg.src);
+                    const blob = await res.blob();
+                    const bmp = await createImageBitmap(blob);
+                    ctx.drawImage(bmp, 42, 24, 176, 176);
+                } catch (e) {
+                    ctx.drawImage(sourceImg, 42, 24, 176, 176);
+                }
+            }
+
+            ctx.fillStyle = '#0F172A';
+            ctx.font = 'bold 22px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(skuAktif, finalCanvas.width / 2, 250);
+
+            finalCanvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${skuAktif}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        // Auto-Sync Kartu Statistik & Tabel Log setiap 2 detik
+        setInterval(async () => {
+            try {
+                const response = await fetch(window.location.href);
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                const newStats = doc.getElementById('live-stats');
+                if (newStats) {
+                    document.getElementById('live-stats').innerHTML = newStats.innerHTML;
+                }
+
+                const newTable = doc.getElementById('live-table');
+                if (newTable) {
+                    document.getElementById('live-table').innerHTML = newTable.innerHTML;
+                }
+            } catch (err) {
+                console.warn('Menunggu sinkronisasi server...', err);
+            }
+        }, 2000);
+    </script>
+
+    <!-- Tombol Navigasi Barang Keluar -->
+    <a href="{{ route('sales.index') }}"
+       class="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-4 font-bold text-slate-950 shadow-lg transition hover:bg-amber-400">
+        <span>📦</span>
+        Barang Keluar
+    </a>
 
 </body>
 </html>

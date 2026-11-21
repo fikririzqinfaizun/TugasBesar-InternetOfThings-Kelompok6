@@ -3,13 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
     protected $guarded = [];
 
-    public function productionLogs()
+    /**
+     * Riwayat produksi produk ini.
+     */
+    public function conveyorLogs(): HasMany
     {
-        return $this->hasMany(ProductionLog::class);
+        return $this->hasMany(ConveyorLog::class, 'product_id');
     }
 }
