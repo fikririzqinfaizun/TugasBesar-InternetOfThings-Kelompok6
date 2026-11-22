@@ -108,19 +108,22 @@ class ProductController extends Controller
 
     /**
      * Mencatat satu produk yang masuk dari conveyor.
-     * Mendukung event_id untuk mencegah pencatatan produksi ganda.
+     * Mendukung event_id untuk mencegah pencatatan produksi ganda
+     * dan sinkron dengan rak_code dari ESP32 (RAK-A, RAK-B, RAK-C).
      */
     public function updateInventory(Request $request)
     {
         $validated = $request->validate([
-            'kode_warna' => 'sometimes|string|in:PNK,HJU,MRH,HTM,PTH',
-            'color' => 'sometimes|string|in:PNK,HJU,MRH,HTM,PTH',
-            'sku' => 'sometimes|string|max:100',
+            'kode_warna'    => 'sometimes|string|in:PNK,HJU,MRH,HTM,PTH',
+            'color'         => 'sometimes|string|in:PNK,HJU,MRH,HTM,PTH',
+            'sku'           => 'sometimes|string|max:100',
             'kecepatan_rpm' => 'sometimes|nullable|numeric|min:0',
-            'speed_rpm' => 'sometimes|nullable|numeric|min:0',
-            'rpm' => 'sometimes|nullable|numeric|min:0',
-            'total_count' => 'sometimes|integer|min:0',
-            'event_id' => 'sometimes|nullable|string|max:100',
+            'speed_rpm'     => 'sometimes|nullable|numeric|min:0',
+            'rpm'           => 'sometimes|nullable|numeric|min:0',
+            'total_count'   => 'sometimes|integer|min:0',
+            'slot'          => 'sometimes|integer|min:0',
+            'rak_code'      => 'sometimes|nullable|string|max:20',
+            'event_id'      => 'sometimes|nullable|string|max:100',
         ]);
 
         $color = $validated['kode_warna']
@@ -130,9 +133,10 @@ class ProductController extends Controller
         $speed = $validated['kecepatan_rpm']
             ?? $validated['speed_rpm']
             ?? $validated['rpm']
-            ?? 80.0;
+            ?? 50.0;
 
         $eventId = $validated['event_id'] ?? null;
+        $requestedRakCode = $validated['rak_code'] ?? null;
 
         if (
             isset($validated['kode_warna'])
@@ -146,7 +150,8 @@ class ProductController extends Controller
                 $validated,
                 $color,
                 $speed,
-                $eventId
+                $eventId,
+                $requestedRakCode
             ) {
                 /*
                  * Periksa apakah kejadian produksi sudah tercatat.
@@ -186,18 +191,29 @@ class ProductController extends Controller
                 }
 
                 /*
-                 * Cari rak aktif yang kapasitasnya belum penuh.
-                 * RAK-D sampai RAK-J tidak digunakan.
+                 * Prioritaskan rak_code yang dikirim oleh ESP32 (RAK-A / RAK-B / RAK-C)
+                 * agar urutan 1-15 RAK-A, 16-30 RAK-B, 31-45 RAK-C sama persis dengan LED fisik.
                  */
-                $rack = Rak::where('is_active', true)
-                    ->whereColumn(
-                        'jumlah_terisi',
-                        '<',
-                        'kapasitas_maksimal'
-                    )
-                    ->orderBy('kode_rak')
-                    ->lockForUpdate()
-                    ->first();
+                $rack = null;
+
+                if (!empty($requestedRakCode)) {
+                    $rack = Rak::where('kode_rak', $requestedRakCode)
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (!$rack) {
+                    $rack = Rak::where('is_active', true)
+                        ->whereColumn(
+                            'jumlah_terisi',
+                            '<',
+                            'kapasitas_maksimal'
+                        )
+                        ->orderBy('kode_rak')
+                        ->lockForUpdate()
+                        ->first();
+                }
 
                 if (!$rack) {
                     return [
@@ -228,8 +244,10 @@ class ProductController extends Controller
                 $product->increment('total_produksi');
                 $product->increment('stok_tersedia');
 
-                // Tambahkan satu unit ke kapasitas rak.
-                $rack->increment('jumlah_terisi');
+                // Tambahkan satu unit ke kapasitas rak (maksimal 15 per rak).
+                if ($rack->jumlah_terisi < ($rack->kapasitas_maksimal ?? 15)) {
+                    $rack->increment('jumlah_terisi');
+                }
 
                 $product->refresh();
                 $rack->refresh();
@@ -305,7 +323,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Mencatat transaksi penjualan produk.
+     * Mencatat transaksi penjualan produk dan mengurangi isi rak yang terisi.
      */
     public function sellProduct(Request $request)
     {
@@ -348,6 +366,17 @@ class ProductController extends Controller
             $product->decrement('stok_tersedia');
             $product->increment('total_terjual');
 
+            // Kurangi 1 isi rak dari rak terakhir yang memiliki stok terisi
+            $lastFilledRack = Rak::where('is_active', true)
+                ->where('jumlah_terisi', '>', 0)
+                ->orderByDesc('kode_rak')
+                ->lockForUpdate()
+                ->first();
+
+            if ($lastFilledRack) {
+                $lastFilledRack->decrement('jumlah_terisi');
+            }
+
             $product->refresh();
 
             return [
@@ -370,7 +399,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Mengubah warna produk yang sedang dipilih.
+     * Mengubah warna produk yang sedang dipilih (menetap sampai diubah lagi).
      */
     public function setActiveColor(Request $request)
     {
@@ -418,10 +447,15 @@ class ProductController extends Controller
 
         $activeColor = $product->kode_warna ?? 'PNK';
 
+        $totalProduksi = (int) $products->sum('total_produksi');
+        $totalTerjual  = (int) $products->sum('total_terjual');
+        $stokAktifRak  = max(0, $totalProduksi - $totalTerjual);
+
         $totals = [
-            'total_produksi' => (int) $products->sum('total_produksi'),
-            'stok_tersedia' => (int) $products->sum('stok_tersedia'),
-            'total_terjual' => (int) $products->sum('total_terjual'),
+            'total_produksi' => $totalProduksi,
+            'stok_tersedia'  => max(0, 45 - $stokAktifRak),
+            'total_terjual'  => $totalTerjual,
+            'stok_aktif_rak' => $stokAktifRak,
         ];
 
         $racks = $this->getActiveRacks();
@@ -440,6 +474,31 @@ class ProductController extends Controller
             'racks' => $racks,
             'logs' => $logs,
             'active_color' => $activeColor,
+        ]);
+    }
+
+    /**
+     * Mengosongkan seluruh data simulasi produksi dan mengembalikan kapasitas rak ke 0.
+     */
+    public function resetInventory()
+    {
+        ConveyorLog::query()->delete();
+
+        Product::query()->update([
+            'total_produksi' => 0,
+            'stok_tersedia'  => 0,
+            'total_terjual'  => 0,
+        ]);
+
+        Rak::query()->update([
+            'jumlah_terisi' => 0,
+        ]);
+
+        Cache::forever('active_shirt_color', 'PNK');
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Seluruh data inventori berhasil di-reset ke 0.',
         ]);
     }
 }

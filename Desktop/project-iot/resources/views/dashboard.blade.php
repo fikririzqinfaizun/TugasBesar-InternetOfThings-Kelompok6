@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Fashion Inventory System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        #qrcode-canvas img, #qrcode-canvas canvas {
+            margin: 0 auto;
+            display: block;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -28,7 +32,10 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-400 border-2 border-amber-100">
+                <button type="button" id="btn-reset-simulasi" onclick="resetSimulasi()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-rose-500/15 text-rose-400 border-2 border-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer">
+                    <span>🔄</span> Reset Simulasi
+                </button>
+                <span id="status-badge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-400 border-2 border-amber-100">
                     <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
                     System Online
                 </span>
@@ -40,13 +47,20 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         <!-- Stat Cards Grid -->
+        @php
+            $totalProduksiTampil = isset($products) ? $products->sum('total_produksi') : ($product->total_produksi ?? 0);
+            $barangTerjualTampil = isset($products) ? $products->sum('total_terjual') : ($product->total_terjual ?? 0);
+            $stokTersediaTampil  = max(0, 45 - $totalProduksiTampil);
+            $logsTampil          = ($logs ?? collect())->take(10);
+        @endphp
+
         <div id="live-stats" class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             <!-- Total Produksi -->
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
                 <div>
                     <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">Total Produksi</p>
-                    <h3 class="text-4xl font-black text-white mt-2">{{ $product->total_produksi ?? 0 }}</h3>
+                    <h3 id="stat-total-produksi" class="text-4xl font-black text-white mt-2">{{ $totalProduksiTampil }}</h3>
                     <p class="text-xs font-bold text-slate-400 mt-1">Item terdeteksi IR Sensor</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-indigo-400 rounded-xl border-2 border-amber-100">
@@ -60,7 +74,7 @@
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
                 <div>
                     <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">Stok Tersedia</p>
-                    <h3 class="text-4xl font-black text-emerald-400 mt-2">{{ $product->stok_tersedia ?? 0 }}</h3>
+                    <h3 id="stat-stok-tersedia" class="text-4xl font-black text-emerald-400 mt-2">{{ $stokTersediaTampil }}</h3>
                     <p class="text-xs font-bold text-slate-400 mt-1">Siap disalurkan di rak</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-emerald-400 rounded-xl border-2 border-amber-100">
@@ -74,7 +88,7 @@
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
                 <div>
                     <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">Barang Terjual</p>
-                    <h3 class="text-4xl font-black text-amber-400 mt-2">{{ $product->total_terjual ?? 0 }}</h3>
+                    <h3 id="stat-barang-terjual" class="text-4xl font-black text-amber-400 mt-2">{{ $barangTerjualTampil }}</h3>
                     <p class="text-xs font-bold text-slate-400 mt-1">Keluar dari gudang</p>
                 </div>
                 <div class="p-3.5 bg-slate-800 text-amber-400 rounded-xl border-2 border-amber-100">
@@ -88,32 +102,37 @@
         <!-- Detail Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            <!-- QR Code Box -->
+            <!-- QR Code & Pilihan Warna Produk Box -->
             <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center">
-                <h2 class="text-xs font-black text-amber-100 uppercase tracking-wider mb-3">QR Code Produk Unique</h2>
+                <h2 class="text-xs font-black text-amber-100 uppercase tracking-wider mb-3">Pilih Warna & QR Produk</h2>
 
-                <!-- Pilihan Warna Baju -->
-                <div class="flex flex-wrap justify-center gap-1.5 mb-4">
-                    <button type="button" onclick="setWarnaBaju('PNK', '#F472B6')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-pink-400 text-pink-400 hover:bg-pink-400/10 transition cursor-pointer">
+                <!-- Status Jeda / Warna Aktif -->
+                <div id="color-lock-banner" class="w-full mb-3 px-3 py-2 rounded-xl bg-slate-950 border-2 border-slate-800 text-[11px] font-bold text-emerald-400">
+                    Warna Aktif Menetap: <span id="active-color-label" class="font-black text-pink-400">Pink (PNK)</span>
+                </div>
+
+                <!-- Pilihan Warna Baju (Menetap + Jeda Pengaman 3 Detik) -->
+                <div id="color-buttons-group" class="flex flex-wrap justify-center gap-1.5 mb-5">
+                    <button type="button" data-kode="PNK" onclick="setWarnaBaju('PNK', '#F472B6')" class="btn-warna px-3 py-1.5 rounded-xl text-[11px] font-black border-2 border-pink-400 text-pink-400 bg-pink-400/15 hover:bg-pink-400/20 transition cursor-pointer">
                         Pink (PNK)
                     </button>
-                    <button type="button" onclick="setWarnaBaju('HJU', '#39FF14')" style="border-color: #39FF14; color: #39FF14;" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 hover:bg-[#39FF14]/10 transition cursor-pointer">
+                    <button type="button" data-kode="HJU" onclick="setWarnaBaju('HJU', '#39FF14')" style="border-color: #39FF14; color: #39FF14;" class="btn-warna px-3 py-1.5 rounded-xl text-[11px] font-black border-2 hover:bg-[#39FF14]/15 transition cursor-pointer">
                         Ijo Neon (HJU)
                     </button>
-                    <button type="button" onclick="setWarnaBaju('MRH', '#F87171')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-red-400 text-red-400 hover:bg-red-400/10 transition cursor-pointer">
+                    <button type="button" data-kode="MRH" onclick="setWarnaBaju('MRH', '#F87171')" class="btn-warna px-3 py-1.5 rounded-xl text-[11px] font-black border-2 border-red-400 text-red-400 hover:bg-red-400/15 transition cursor-pointer">
                         Merah (MRH)
                     </button>
-                    <button type="button" onclick="setWarnaBaju('HTM', '#94A3B8')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-slate-400 text-slate-300 hover:bg-slate-400/10 transition cursor-pointer">
+                    <button type="button" data-kode="HTM" onclick="setWarnaBaju('HTM', '#94A3B8')" class="btn-warna px-3 py-1.5 rounded-xl text-[11px] font-black border-2 border-slate-400 text-slate-300 hover:bg-slate-400/15 transition cursor-pointer">
                         Hitam (HTM)
                     </button>
-                    <button type="button" onclick="setWarnaBaju('PTH', '#F8FAFC')" class="px-3 py-1 rounded-xl text-[11px] font-black border-2 border-white text-white hover:bg-white/10 transition cursor-pointer">
+                    <button type="button" data-kode="PTH" onclick="setWarnaBaju('PTH', '#F8FAFC')" class="btn-warna px-3 py-1.5 rounded-xl text-[11px] font-black border-2 border-white text-white hover:bg-white/15 transition cursor-pointer">
                         Putih (PTH)
                     </button>
                 </div>
 
                 <!-- Area Label QR -->
                 <div id="area-label-qr" style="border-color: #F472B6;" class="p-4 bg-white rounded-2xl border-4 shadow-inner transition-colors duration-200 flex items-center justify-center">
-                    <div id="qrcode-canvas" class="w-44 h-44 flex items-center justify-center"></div>
+                    <div id="qrcode-canvas" class="w-40 h-40 flex items-center justify-center"></div>
                 </div>
 
                 <!-- Badge SKU -->
@@ -145,15 +164,19 @@
                             <thead class="text-xs font-black text-amber-100 uppercase bg-slate-950 border-b-4 border-amber-100">
                                 <tr>
                                     <th class="py-3.5 px-4 border-r-2 border-amber-100">Waktu Log</th>
+                                    <th class="py-3.5 px-4 border-r-2 border-amber-100">Warna / SKU</th>
                                     <th class="py-3.5 px-4 border-r-2 border-amber-100">Alokasi Rak</th>
                                     <th class="py-3.5 px-4 text-right">Kecepatan PID (RPM)</th>
                                 </tr>
                             </thead>
                             <tbody id="live-table" class="divide-y-2 divide-slate-800 font-bold">
-                                @forelse($logs as $log)
+                                @forelse($logsTampil as $log)
                                     <tr class="hover:bg-slate-800/80 transition-colors">
                                         <td class="py-3.5 px-4 font-mono text-xs text-slate-300 border-r-2 border-slate-800">
-                                            {{ $log->created_at->format('H:i:s - d M Y') }}
+                                            {{ \Carbon\Carbon::parse($log->created_at)->timezone('Asia/Jakarta')->format('H:i:s - d M Y') }}
+                                        </td>
+                                        <td class="py-3.5 px-4 font-mono text-xs text-amber-200 border-r-2 border-slate-800">
+                                            {{ $log->product->kode_warna ?? '-' }} ({{ $log->product->sku ?? '-' }})
                                         </td>
                                         <td class="py-3.5 px-4 border-r-2 border-slate-800">
                                             @php
@@ -175,7 +198,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" class="py-10 text-center text-slate-500 text-xs font-bold">
+                                        <td colspan="4" class="py-10 text-center text-slate-500 text-xs font-bold">
                                             Belum ada aktivitas konveyor tercatat.
                                         </td>
                                     </tr>
@@ -189,7 +212,7 @@
         </div>
     </main>
 
-    <!-- Script Pengatur Warna SKU, Download QR & Auto-Sync Data -->
+    <!-- Script Lengkap: Pilihan Warna Menetap + Jeda Pengaman 3 Detik, QR Code, Reset Simulasi & Auto-Sync Realtime -->
     <script>
         let urutanWarna = {
             PNK: 2,
@@ -199,36 +222,98 @@
             PTH: 1
         };
 
-        let hexSaatIni = '#F472B6';
-        let skuAktif = 'PNK-001';
+        const KONFIG_WARNA = {
+            PNK: { nama: 'Pink (PNK)',     hex: '#F472B6' },
+            HJU: { nama: 'Ijo Neon (HJU)', hex: '#39FF14' },
+            MRH: { nama: 'Merah (MRH)',    hex: '#F87171' },
+            HTM: { nama: 'Hitam (HTM)',    hex: '#94A3B8' },
+            PTH: { nama: 'Putih (PTH)',    hex: '#F8FAFC' }
+        };
+
+        let warnaAktifSaatIni = '{{ $activeColor ?? "PNK" }}';
+        if (!KONFIG_WARNA[warnaAktifSaatIni]) warnaAktifSaatIni = 'PNK';
+
+        let hexSaatIni = KONFIG_WARNA[warnaAktifSaatIni].hex;
+        let skuAktif = `${warnaAktifSaatIni}-001`;
+        let sedangJedaKunci = false;
+        let timerJedaInterval = null;
 
         function renderQRCode(teksSku) {
             const container = document.getElementById('qrcode-canvas');
+            if (!container) return;
             container.innerHTML = '';
 
             if (typeof QRCode !== 'undefined') {
-                new QRCode(container, {
-                    text: teksSku,
-                    width: 176,
-                    height: 176,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            } else {
-                const img = document.createElement('img');
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(teksSku)}`;
-                img.className = 'w-44 h-44 object-contain';
-                container.appendChild(img);
+                try {
+                    new QRCode(container, {
+                        text: teksSku,
+                        width: 160,
+                        height: 160,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    return;
+                } catch (e) {
+                    console.warn('QRCode library error, beralih ke fallback gambar:', e);
+                }
             }
+
+            const img = document.createElement('img');
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(teksSku)}`;
+            img.alt = `QR ${teksSku}`;
+            img.className = 'w-40 h-40 object-contain';
+            container.appendChild(img);
         }
 
-        // Langsung tampilkan PNK-001 & QR-nya saat halaman dibuka
-        window.addEventListener('load', function() {
-            renderQRCode(skuAktif);
-        });
+        function perbaruiTampilanTombolAktif(kode) {
+            document.querySelectorAll('.btn-warna').forEach(btn => {
+                if (btn.dataset.kode === kode) {
+                    btn.style.backgroundColor = 'rgba(255, 255, 255, 0.14)';
+                    btn.style.transform = 'scale(1.04)';
+                } else {
+                    btn.style.backgroundColor = 'transparent';
+                    btn.style.transform = 'scale(1)';
+                }
+            });
+        }
 
-        function setWarnaBaju(kode, hex) {
+        function mulaiJedaPengaman(kode, hex) {
+            const banner = document.getElementById('color-lock-banner');
+            const buttons = document.querySelectorAll('.btn-warna');
+            const namaWarna = KONFIG_WARNA[kode].nama;
+
+            sedangJedaKunci = true;
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('opacity-60', 'cursor-not-allowed');
+            });
+
+            let sisa = 3.0;
+            clearInterval(timerJedaInterval);
+
+            banner.innerHTML = `Mengunci <span style="color:${hex}" class="font-black">${namaWarna}</span> (${sisa.toFixed(1)}s) — Siap masukkan barang...`;
+
+            timerJedaInterval = setInterval(() => {
+                sisa -= 0.1;
+                if (sisa <= 0) {
+                    clearInterval(timerJedaInterval);
+                    sedangJedaKunci = false;
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                    });
+                    banner.innerHTML = `Warna Aktif Menetap: <span style="color:${hex}" class="font-black">${namaWarna}</span>`;
+                } else {
+                    banner.innerHTML = `Mengunci <span style="color:${hex}" class="font-black">${namaWarna}</span> (${sisa.toFixed(1)}s) — Siap masukkan barang...`;
+                }
+            }, 100);
+        }
+
+        async function setWarnaBaju(kode, hex) {
+            if (sedangJedaKunci) return;
+
+            warnaAktifSaatIni = kode;
             hexSaatIni = hex;
 
             let nomor = String(urutanWarna[kode]).padStart(3, '0');
@@ -241,9 +326,40 @@
             skuText.style.color = hex;
             skuText.innerText = skuAktif;
 
+            perbaruiTampilanTombolAktif(kode);
             renderQRCode(skuAktif);
             urutanWarna[kode]++;
+
+            mulaiJedaPengaman(kode, hex);
+
+            try {
+                await fetch('/api/inventory/set-color', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ kode_warna: kode })
+                });
+            } catch (err) {
+                console.warn('Gagal sinkronisasi warna ke server:', err);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('area-label-qr').style.borderColor = hexSaatIni;
+            document.getElementById('badge-sku-box').style.borderColor = hexSaatIni;
+            const skuText = document.getElementById('sku-text');
+            skuText.style.color = hexSaatIni;
+            skuText.innerText = skuAktif;
+
+            const banner = document.getElementById('color-lock-banner');
+            banner.innerHTML = `Warna Aktif Menetap: <span style="color:${hexSaatIni}" class="font-black">${KONFIG_WARNA[warnaAktifSaatIni].nama}</span>`;
+
+            perbaruiTampilanTombolAktif(warnaAktifSaatIni);
+            renderQRCode(skuAktif);
+            fetchRealtimeData();
+        });
 
         async function downloadQR() {
             const qrContainer = document.getElementById('qrcode-canvas');
@@ -293,26 +409,142 @@
             }, 'image/png');
         }
 
-        // Auto-Sync Kartu Statistik & Tabel Log setiap 2 detik
-        setInterval(async () => {
-            try {
-                const response = await fetch(window.location.href);
-                const html = await response.text();
-                const doc = new DOMParser().parseFromString(html, 'text/html');
+        function formatWaktuLog(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            const jam = date.toLocaleTimeString('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(/\./g, ':');
 
-                const newStats = doc.getElementById('live-stats');
-                if (newStats) {
-                    document.getElementById('live-stats').innerHTML = newStats.innerHTML;
+            const tgl = date.toLocaleDateString('en-GB', {
+                timeZone: 'Asia/Jakarta',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            return `${jam} - ${tgl}`;
+        }
+
+        function getBadgeColor(rakCode) {
+            switch (rakCode) {
+                case 'RAK-A': return 'bg-indigo-500/20 text-indigo-300 border-amber-100';
+                case 'RAK-B': return 'bg-purple-500/20 text-purple-300 border-amber-100';
+                case 'RAK-C': return 'bg-pink-500/20 text-pink-300 border-amber-100';
+                default:      return 'bg-slate-500/20 text-slate-400 border-amber-100';
+            }
+        }
+
+        async function fetchRealtimeData() {
+            try {
+                const response = await fetch('/api/inventory/realtime', {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) return;
+                const data = await response.json();
+
+                if (data.totals) {
+                    document.getElementById('stat-total-produksi').textContent = data.totals.total_produksi ?? 0;
+                    document.getElementById('stat-stok-tersedia').textContent  = data.totals.stok_tersedia ?? 45;
+                    document.getElementById('stat-barang-terjual').textContent = data.totals.total_terjual ?? 0;
                 }
 
-                const newTable = doc.getElementById('live-table');
-                if (newTable) {
-                    document.getElementById('live-table').innerHTML = newTable.innerHTML;
+                const tbody = document.getElementById('live-table');
+                const logs = Array.isArray(data.logs) ? data.logs.slice(0, 10) : [];
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="py-10 text-center text-slate-500 text-xs font-bold">
+                                Belum ada aktivitas konveyor tercatat.
+                            </td>
+                        </tr>`;
+                } else {
+                    tbody.innerHTML = logs.map(log => {
+                        const rakCode = (log.rak && log.rak.kode_rak) ? log.rak.kode_rak : '-';
+                        const warnaCode = (log.product && log.product.kode_warna) ? log.product.kode_warna : '-';
+                        const skuCode = (log.product && log.product.sku) ? log.product.sku : '-';
+                        const badgeClass = getBadgeColor(rakCode);
+                        const rpm = Number(log.kecepatan_rpm ?? 0).toFixed(1);
+                        const waktu = formatWaktuLog(log.created_at);
+
+                        return `
+                            <tr class="hover:bg-slate-800/80 transition-colors">
+                                <td class="py-3.5 px-4 font-mono text-xs text-slate-300 border-r-2 border-slate-800">
+                                    ${waktu}
+                                </td>
+                                <td class="py-3.5 px-4 font-mono text-xs text-amber-200 border-r-2 border-slate-800">
+                                    ${warnaCode} (${skuCode})
+                                </td>
+                                <td class="py-3.5 px-4 border-r-2 border-slate-800">
+                                    <span class="px-3 py-1 rounded-lg text-xs font-black border-2 ${badgeClass}">
+                                        ${rakCode}
+                                    </span>
+                                </td>
+                                <td class="py-3.5 px-4 text-right font-mono font-black text-emerald-400">
+                                    ${rpm} RPM
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
                 }
             } catch (err) {
                 console.warn('Menunggu sinkronisasi server...', err);
             }
-        }, 2000);
+        }
+
+        async function resetSimulasi() {
+            const konfirmasi = confirm('Kosongkan semua data produksi, log, dan kembalikan lampu LED rak ke kondisi awal?');
+            if (!konfirmasi) return;
+
+            const btn = document.getElementById('btn-reset-simulasi');
+            const teksAsli = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Mereset...';
+
+            try {
+                const res = await fetch('/api/inventory/reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (res.ok) {
+                    urutanWarna = { PNK: 2, HJU: 1, MRH: 1, HTM: 1, PTH: 1 };
+                    warnaAktifSaatIni = 'PNK';
+                    hexSaatIni = KONFIG_WARNA.PNK.hex;
+                    skuAktif = 'PNK-001';
+
+                    document.getElementById('area-label-qr').style.borderColor = hexSaatIni;
+                    document.getElementById('badge-sku-box').style.borderColor = hexSaatIni;
+                    const skuText = document.getElementById('sku-text');
+                    skuText.style.color = hexSaatIni;
+                    skuText.innerText = skuAktif;
+                    document.getElementById('color-lock-banner').innerHTML =
+                        `Warna Aktif Menetap: <span style="color:${hexSaatIni}" class="font-black">${KONFIG_WARNA.PNK.nama}</span>`;
+
+                    perbaruiTampilanTombolAktif('PNK');
+                    renderQRCode('PNK-001');
+                    await fetchRealtimeData();
+                } else {
+                    alert('Gagal mereset data. Periksa terminal Laravel.');
+                }
+            } catch (err) {
+                alert('Terjadi kesalahan koneksi ke server.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = teksAsli;
+            }
+        }
+
+        setInterval(fetchRealtimeData, 1500);
     </script>
 
     <!-- Tombol Navigasi Barang Keluar -->

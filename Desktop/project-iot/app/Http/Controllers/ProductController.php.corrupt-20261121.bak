@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Fashion Inventory System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        #qrcode-canvas svg {
+            width: 176px !important;
+            height: 176px !important;
+            display: block;
+        }
+
+        .color-button.active {
+            background-color: rgba(255, 255, 255, 0.10);
+            box-shadow: 0 0 0 2px currentColor;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+    <!-- Navigasi -->
+    <header class="bg-slate-900 border-b-4 border-amber-100 sticky top-0 z-50 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-amber-100 shadow-md border-2 border-amber-100">
+                    SF
+                </div>
+
+                <div>
+                    <h1 class="text-base font-black text-white leading-tight">
+                        Smart Fashion Inventory
+                    </h1>
+
+                    <p class="text-xs font-bold text-slate-400">
+                        Conveyor PID (80 RPM) &amp; 8 Items/Rack System
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-400 border-2 border-amber-100">
+                    <span id="connection-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span id="connection-status">Menghubungkan...</span>
+                </span>
+            </div>
+
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Statistik Gabungan Lima Varian -->
+        <section>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-black text-amber-100 uppercase tracking-wider">
+                    Statistik Inventaris Keseluruhan
+                </h2>
+
+                <span class="text-xs font-bold text-slate-400">
+                    Gabungan 5 Varian Warna
+                </span>
+            </div>
+
+            <div id="live-stats" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <!-- Total Produksi -->
+                <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">
+                            Total Produksi
+                        </p>
+
+                        <h3 id="total-produksi" class="text-4xl font-black text-white mt-2">
+                            {{ $totals['total_produksi'] ?? 0 }}
+                        </h3>
+
+                        <p class="text-xs font-bold text-slate-400 mt-1">
+                            Seluruh warna pakaian
+                        </p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-800 text-indigo-400 rounded-xl border-2 border-amber-100">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Stok Tersedia -->
+                <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">
+                            Stok Tersedia
+                        </p>
+
+                        <h3 id="stok-tersedia" class="text-4xl font-black text-emerald-400 mt-2">
+                            {{ $totals['stok_tersedia'] ?? 0 }}
+                        </h3>
+
+                        <p class="text-xs font-bold text-slate-400 mt-1">
+                            Total seluruh varian
+                        </p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-800 text-emerald-400 rounded-xl border-2 border-amber-100">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Barang Terjual -->
+                <div class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wider text-amber-100/80">
+                            Barang Terjual
+                        </p>
+
+                        <h3 id="total-terjual" class="text-4xl font-black text-amber-400 mt-2">
+                            {{ $totals['total_terjual'] ?? 0 }}
+                        </h3>
+
+                        <p class="text-xs font-bold text-slate-400 mt-1">
+                            Total seluruh varian
+                        </p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-800 text-amber-400 rounded-xl border-2 border-amber-100">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Informasi Varian Aktif -->
+        <section class="bg-slate-900 border-2 border-slate-700 rounded-2xl p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wider text-slate-400">
+                        Varian Produk Aktif
+                    </p>
+
+                    <h2 id="selected-product-name" class="text-xl font-black text-white mt-1">
+                        {{ $product->nama_pakaian }}
+                    </h2>
+
+                    <p class="text-xs font-mono text-amber-300 mt-1">
+                        SKU: <span id="selected-product-sku">{{ $product->sku }}</span>
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-slate-950 rounded-xl px-4 py-3 border border-slate-700">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Produksi</p>
+                        <p id="variant-production" class="text-xl font-black text-white">
+                            {{ $product->total_produksi }}
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950 rounded-xl px-4 py-3 border border-slate-700">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Stok</p>
+                        <p id="variant-stock" class="text-xl font-black text-emerald-400">
+                            {{ $product->stok_tersedia }}
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950 rounded-xl px-4 py-3 border border-slate-700">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Terjual</p>
+                        <p id="variant-sold" class="text-xl font-black text-amber-400">
+                            {{ $product->total_terjual }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monitoring Kapasitas Rak -->
+        <section class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg">
+
+            <div class="flex items-center justify-between mb-6 pb-3 border-b-4 border-amber-100">
+                <h2 class="text-sm font-black text-amber-100 uppercase tracking-wider">
+                    Monitoring Kapasitas Rak
+                </h2>
+
+                <span class="text-xs font-black text-slate-300">
+                    Maksimal 8 Item / Rak
+                </span>
+            </div>
+
+            <div id="rack-container" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                @foreach($racks ?? [] as $rack)
+                    <div class="bg-slate-950 p-5 rounded-xl border-2 border-slate-700">
+                        <p class="font-black text-indigo-300">{{ $rack->kode_rak }}</p>
+                        <p class="text-2xl font-black text-white mt-3">
+                            {{ $rack->jumlah_terisi }} / {{ $rack->kapasitas_maksimal }} Item
+                        </p>
+                    </div>
+                @endforeach
+
+            </div>
+        </section>
+
+        <!-- Detail Dashboard -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- QR Code dan Pemilihan Warna -->
+            <section class="bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-center">
+
+                <h2 class="text-xs font-black text-amber-100 uppercase tracking-wider mb-3">
+                    QR Code Produk
+                </h2>
+
+                <p class="text-xs text-slate-400 mb-3">
+                    Pilih varian warna produk
+                </p>
+
+                <div class="flex flex-wrap justify-center gap-2 mb-4">
+
+                    <button type="button" data-color="PNK"
+                        onclick="setWarnaBaju('PNK')"
+                        class="color-button px-3 py-2 rounded-xl text-[11px] font-black border-2 border-pink-400 text-pink-400 hover:bg-pink-400/10 transition">
+                        Pink (PNK)
+                    </button>
+
+                    <button type="button" data-color="HJU"
+                        onclick="setWarnaBaju('HJU')"
+                        style="border-color: #39FF14; color: #39FF14;"
+                        class="color-button px-3 py-2 rounded-xl text-[11px] font-black border-2 hover:bg-[#39FF14]/10 transition">
+                        Ijo Neon (HJU)
+                    </button>
+
+                    <button type="button" data-color="MRH"
+                        onclick="setWarnaBaju('MRH')"
+                        class="color-button px-3 py-2 rounded-xl text-[11px] font-black border-2 border-red-400 text-red-400 hover:bg-red-400/10 transition">
+                        Merah (MRH)
+                    </button>
+
+                    <button type="button" data-color="HTM"
+                        onclick="setWarnaBaju('HTM')"
+                        class="color-button px-3 py-2 rounded-xl text-[11px] font-black border-2 border-slate-400 text-slate-300 hover:bg-slate-400/10 transition">
+                        Hitam (HTM)
+                    </button>
+
+                    <button type="button" data-color="PTH"
+                        onclick="setWarnaBaju('PTH')"
+                        class="color-button px-3 py-2 rounded-xl text-[11px] font-black border-2 border-white text-white hover:bg-white/10 transition">
+                        Putih (PTH)
+                    </button>
+
+                </div>
+
+                <div id="area-label-qr"
+                    style="border-color: #F472B6;"
+                    class="p-4 bg-white rounded-2xl border-4 shadow-inner transition-colors duration-200 flex items-center justify-center">
+
+                    <div id="qrcode-canvas" class="w-44 h-44 flex items-center justify-center"></div>
+
+                </div>
+
+                <p id="badge-sku-box"
+                    style="border-color: #F472B6;"
+                    class="mt-4 text-xs font-mono text-slate-200 bg-slate-950 px-5 py-2 rounded-xl border-2 font-bold transition-colors duration-200">
+
+                    SKU:
+                    <span id="sku-text" style="color: #F472B6;" class="font-black">
+                        {{ $product->sku }}
+                    </span>
+
+                </p>
+
+                <p id="color-status" class="mt-2 text-xs text-slate-400">
+                    Warna aktif: {{ $activeColor }}
+                </p>
+
+                <p id="qr-status" class="mt-2 text-xs text-slate-400">
+                    QR Code mengarah ke detail produk.
+                </p>
+
+                <button type="button"
+                    onclick="downloadQR()"
+                    class="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-sky-400 text-slate-950 hover:bg-sky-300 transition shadow-md">
+
+                    Download QR Code
+
+                </button>
+
+            </section>
+
+            <!-- Riwayat Konveyor -->
+            <section class="lg:col-span-2 bg-slate-900 border-4 border-amber-100 rounded-2xl p-6 shadow-lg">
+
+                <div class="flex items-center justify-between mb-4 pb-3 border-b-4 border-amber-100">
+
+                    <h2 class="text-xs font-black text-slate-200 uppercase tracking-wider">
+                        Monitoring Konveyor Real-Time
+                    </h2>
+
+                    <span class="text-xs font-black text-amber-100 bg-slate-800 px-3 py-1 rounded-lg border-2 border-amber-100">
+                        10 Log Terakhir
+                    </span>
+
+                </div>
+
+                <div class="overflow-x-auto">
+
+                    <table class="w-full text-left text-sm text-slate-200">
+
+                        <thead class="text-xs font-black text-amber-100 uppercase bg-slate-950 border-b-4 border-amber-100">
+                            <tr>
+                                <th class="py-3 px-3 border-r-2 border-amber-100">Waktu</th>
+                                <th class="py-3 px-3 border-r-2 border-amber-100">SKU</th>
+                                <th class="py-3 px-3 border-r-2 border-amber-100">Rak</th>
+                                <th class="py-3 px-3 text-right">Kecepatan</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="live-table" class="divide-y-2 divide-slate-800 font-bold">
+
+                            @forelse($logs as $log)
+                                <tr class="hover:bg-slate-800/80 transition-colors">
+                                    <td class="py-3 px-3 font-mono text-xs text-slate-300 border-r-2 border-slate-800">
+                                        {{ $log->created_at->format('H:i:s - d M Y') }}
+                                    </td>
+
+                                    <td class="py-3 px-3 border-r-2 border-slate-800 text-amber-300 font-mono text-xs">
+                                        {{ $log->product->sku ?? '-' }}
+                                    </td>
+
+                                    <td class="py-3 px-3 border-r-2 border-slate-800">
+                                        <span class="px-2 py-1 rounded-lg text-xs font-black border border-amber-100">
+                                            {{ $log->rak->kode_rak ?? '-' }}
+                                        </span>
+                                    </td>
+
+                                    <td class="py-3 px-3 text-right font-mono font-black text-emerald-400">
+                                        {{ number_format($log->kecepatan_rpm, 1) }} RPM
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="py-10 text-center text-slate-500 text-xs font-bold">
+                                        Belum ada aktivitas konveyor tercatat.
+                                    </td>
+                                </tr>
+                            @endforelse
+
+                        </tbody>
+                    </table>
+
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // SKU dan varian produk yang sedang aktif.
+        let productSku = @json($product->sku);
+        let activeColor = @json($activeColor);
+        let productDetailUrl = '';
+
+        // Endpoint API Laravel.
+        const API = {
+            realtime: '/api/inventory/realtime',
+            setColor: '/api/inventory/set-color'
+        };
+
+        // Daftar warna pakaian.
+        const colorMap = {
+            PNK: '#F472B6',
+            HJU: '#39FF14',
+            MRH: '#F87171',
+            HTM: '#94A3B8',
+            PTH: '#F8FAFC'
+        };
+
+        const colorNames = {
+            PNK: 'Pink',
+            HJU: 'Hijau Neon',
+            MRH: 'Merah',
+            HTM: 'Hitam',
+            PTH: 'Putih'
+        };
+
+        let hexSaatIni = colorMap[activeColor] ?? '#F472B6';
+
+        /**
+         * Membuat URL detail sesuai SKU aktif.
+         */
+        function updateProductUrl() {
+            productDetailUrl =
+                window.location.origin +
+                '/product/' +
+                encodeURIComponent(productSku);
+        }
+
+        /**
+         * Memperbarui tampilan informasi produk.
+         */
+        function updateSelectedProduct(product) {
+            if (!product) return;
+
+            productSku = product.sku;
+
+            document.getElementById('sku-text').textContent = productSku;
+            document.getElementById('selected-product-sku').textContent = productSku;
+
+            document.getElementById('selected-product-name').textContent =
+                product.nama_pakaian ?? 'Smart Fashion Apparel';
+
+            document.getElementById('variant-production').textContent =
+                product.total_produksi ?? 0;
+
+            document.getElementById('variant-stock').textContent =
+                product.stok_tersedia ?? 0;
+
+            document.getElementById('variant-sold').textContent =
+                product.total_terjual ?? 0;
+
+            updateProductUrl();
+            renderQRCode();
+        }
+
+        /**
+         * Menerapkan warna aktif pada elemen dashboard.
+         */
+        function applyActiveColor(hex) {
+            hexSaatIni = hex;
+
+            document.getElementById('area-label-qr').style.borderColor = hex;
+            document.getElementById('badge-sku-box').style.borderColor = hex;
+            document.getElementById('sku-text').style.color = hex;
+
+            document.getElementById('color-status').textContent =
+                'Warna aktif: ' + (colorNames[activeColor] ?? activeColor) +
+                ' (' + activeColor + ')';
+
+            document.querySelectorAll('.color-button').forEach(function(button) {
+                button.classList.toggle(
+                    'active',
+                    button.dataset.color === activeColor
+                );
+            });
+        }
+
+        /**
+         * Membuat QR Code berdasarkan SKU aktif.
+         */
+        function renderQRCode() {
+            const container = document.getElementById('qrcode-canvas');
+            const status = document.getElementById('qr-status');
+
+            container.innerHTML = '';
+
+            if (typeof qrcode === 'undefined') {
+                status.textContent = 'Library QR Code belum berhasil dimuat.';
+                return;
+            }
+
+            updateProductUrl();
+
+            try {
+                const qr = qrcode(0, 'M');
+
+                qr.addData(productDetailUrl);
+                qr.make();
+
+                container.innerHTML = qr.createSvgTag({
+                    scalable: true,
+                    margin: 0
+                });
+
+                status.textContent =
+                    'QR Code mengarah ke detail ' + productSku + '.';
+
+            } catch (error) {
+                console.error('QR Code error:', error);
+                status.textContent = 'Gagal membuat QR Code.';
+            }
+        }
+
+        /**
+         * Memilih warna sekaligus mengaktifkan SKU produk.
+         */
+        async function setWarnaBaju(kode) {
+            const status = document.getElementById('color-status');
+            const hex = colorMap[kode];
+
+            if (!hex) {
+                status.textContent = 'Kode warna tidak valid.';
+                return;
+            }
+
+            status.textContent = 'Mengubah varian produk...';
+
+            try {
+                const response = await fetch(API.setColor, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        kode_warna: kode
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Gagal mengubah warna.');
+                }
+
+                activeColor = result.active_color;
+
+                applyActiveColor(hex);
+
+                if (result.product) {
+                    updateSelectedProduct(result.product);
+                }
+
+                status.textContent =
+                    'Varian aktif: ' + colorNames[activeColor] +
+                    ' (' + activeColor + ')';
+
+            } catch (error) {
+                console.error('Kesalahan sinkronisasi warna:', error);
+                status.textContent = error.message;
+            }
+        }
+
+        /**
+         * Mengunduh QR Code sebagai gambar PNG.
+         */
+        function downloadQR() {
+            const qrContainer = document.getElementById('qrcode-canvas');
+            const svgEl = qrContainer.querySelector('svg');
+
+            if (!svgEl) {
+                alert('QR Code belum tersedia.');
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = 260;
+            canvas.height = 300;
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = hexSaatIni;
+            ctx.lineWidth = 8;
+            ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+
+            const svgData = new XMLSerializer().serializeToString(svgEl);
+
+            const svgBlob = new Blob(
+                [svgData],
+                { type: 'image/svg+xml;charset=utf-8' }
+            );
+
+            const objectUrl = URL.createObjectURL(svgBlob);
+            const image = new Image();
+
+            image.onload = function() {
+                ctx.drawImage(image, 42, 24, 176, 176);
+
+                ctx.fillStyle = '#0F172A';
+                ctx.font = 'bold 17px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(productSku, canvas.width / 2, 235);
+
+                ctx.font = '10px sans-serif';
+                ctx.fillText(
+                    'Smart Fashion Inventory',
+                    canvas.width / 2,
+                    255
+                );
+
+                URL.revokeObjectURL(objectUrl);
+
+                canvas.toBlob(function(blob) {
+                    if (!blob) {
+                        alert('Gagal membuat gambar QR Code.');
+                        return;
+                    }
+
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+
+                    link.href = downloadUrl;
+                    link.download = productSku + '.png';
+
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    URL.revokeObjectURL(downloadUrl);
+
+                }, 'image/png');
+            };
+
+            image.onerror = function() {
+                URL.revokeObjectURL(objectUrl);
+                alert('Gagal memproses gambar QR Code.');
+            };
+
+            image.src = objectUrl;
+        }
+
+        /**
+         * Memperbarui statistik gabungan lima varian.
+         */
+        function updateStatistics(totals) {
+            if (!totals) return;
+
+            document.getElementById('total-produksi').textContent =
+                totals.total_produksi ?? 0;
+
+            document.getElementById('stok-tersedia').textContent =
+                totals.stok_tersedia ?? 0;
+
+            document.getElementById('total-terjual').textContent =
+                totals.total_terjual ?? 0;
+        }
+
+        /**
+         * Memperbarui tampilan kapasitas rak.
+         */
+        function updateRacks(racks) {
+            const container = document.getElementById('rack-container');
+
+            const colors = {
+                'RAK-A': 'text-indigo-300',
+                'RAK-B': 'text-purple-300',
+                'RAK-C': 'text-pink-300'
+            };
+
+            const orderedCodes = ['RAK-A', 'RAK-B', 'RAK-C'];
+
+            container.innerHTML = '';
+
+            orderedCodes.forEach(function(code) {
+                const rack = racks.find(item => item.kode_rak === code);
+
+                const filled = Number(rack?.jumlah_terisi ?? 0);
+                const capacity = Number(rack?.kapasitas_maksimal ?? 8);
+
+                const percentage = capacity > 0
+                    ? Math.min((filled / capacity) * 100, 100)
+                    : 0;
+
+                const card = document.createElement('div');
+
+                card.className =
+                    'bg-slate-950 p-5 rounded-xl border-2 border-slate-700';
+
+                const title = document.createElement('p');
+                title.className = 'font-black ' + colors[code];
+                title.textContent = code;
+
+                const count = document.createElement('p');
+                count.className = 'text-2xl font-black text-white mt-3';
+                count.textContent = filled + ' / ' + capacity + ' Item';
+
+                const progress = document.createElement('div');
+                progress.className =
+                    'w-full bg-slate-800 rounded-full h-3 mt-4 overflow-hidden';
+
+                const bar = document.createElement('div');
+                bar.className = 'bg-emerald-400 h-3 rounded-full';
+                bar.style.width = percentage + '%';
+
+                progress.appendChild(bar);
+
+                const rackStatus = document.createElement('p');
+                rackStatus.className = 'text-xs font-bold text-slate-400 mt-3';
+
+                rackStatus.textContent = filled >= capacity
+                    ? 'Kapasitas penuh'
+                    : 'Slot tersedia: ' + (capacity - filled);
+
+                card.appendChild(title);
+                card.appendChild(count);
+                card.appendChild(progress);
+                card.appendChild(rackStatus);
+
+                container.appendChild(card);
+            });
+        }
+
+        /**
+         * Memperbarui tabel riwayat konveyor.
+         */
+        function updateLogs(logs) {
+            const table = document.getElementById('live-table');
+
+            table.innerHTML = '';
+
+            if (!logs || logs.length === 0) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+
+                cell.colSpan = 4;
+                cell.className =
+                    'py-10 text-center text-slate-500 text-xs font-bold';
+
+                cell.textContent =
+                    'Belum ada aktivitas konveyor tercatat.';
+
+                row.appendChild(cell);
+                table.appendChild(row);
+
+                return;
+            }
+
+            logs.forEach(function(log) {
+                const row = document.createElement('tr');
+                row.className =
+                    'hover:bg-slate-800/80 transition-colors';
+
+                const dateCell = document.createElement('td');
+                dateCell.className =
+                    'py-3 px-3 font-mono text-xs text-slate-300 border-r-2 border-slate-800';
+
+                const date = new Date(log.created_at);
+
+                dateCell.textContent = isNaN(date.getTime())
+                    ? '-'
+                    : date.toLocaleString('id-ID');
+
+                const skuCell = document.createElement('td');
+                skuCell.className =
+                    'py-3 px-3 border-r-2 border-slate-800 text-amber-300 font-mono text-xs';
+
+                skuCell.textContent = log.product?.sku ?? '-';
+
+                const rackCell = document.createElement('td');
+                rackCell.className =
+                    'py-3 px-3 border-r-2 border-slate-800';
+
+                const rackBadge = document.createElement('span');
+                const rackCode = log.rak?.kode_rak ?? '-';
+
+                const rackColors = {
+                    'RAK-A': 'bg-indigo-500/20 text-indigo-300',
+                    'RAK-B': 'bg-purple-500/20 text-purple-300',
+                    'RAK-C': 'bg-pink-500/20 text-pink-300'
+                };
+
+                rackBadge.className =
+                    'px-2 py-1 rounded-lg text-xs font-black border border-amber-100 ' +
+                    (rackColors[rackCode] ?? 'bg-slate-500/20 text-slate-400');
+
+                rackBadge.textContent = rackCode;
+                rackCell.appendChild(rackBadge);
+
+                const speedCell = document.createElement('td');
+                speedCell.className =
+                    'py-3 px-3 text-right font-mono font-black text-emerald-400';
+
+                speedCell.textContent =
+                    Number(log.kecepatan_rpm ?? 0).toFixed(1) + ' RPM';
+
+                row.appendChild(dateCell);
+                row.appendChild(skuCell);
+                row.appendChild(rackCell);
+                row.appendChild(speedCell);
+
+                table.appendChild(row);
+            });
+        }
+
+        /**
+         * Memperbarui status koneksi.
+         */
+        function setConnectionStatus(online) {
+            const status = document.getElementById('connection-status');
+            const indicator = document.getElementById('connection-indicator');
+
+            status.textContent = online
+                ? 'System Online'
+                : 'Connection Error';
+
+            indicator.className = online
+                ? 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping'
+                : 'w-2.5 h-2.5 rounded-full bg-red-500';
+        }
+
+        /**
+         * Mengambil data realtime dari Laravel.
+         */
+        async function refreshDashboard() {
+            try {
+                const response = await fetch(API.realtime, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Gagal mengambil data dashboard.');
+                }
+
+                const data = await response.json();
+
+                if (data.status !== 'success' || !data.product) {
+                    throw new Error('Format data dashboard tidak sesuai.');
+                }
+
+                // Statistik gabungan lima varian.
+                updateStatistics(data.totals);
+
+                // Informasi produk aktif.
+                updateSelectedProduct(data.selected_product ?? data.product);
+
+                // Monitoring rak dan riwayat.
+                updateRacks(data.racks ?? []);
+                updateLogs(data.logs ?? []);
+
+                // Sinkronisasi warna aktif dengan server.
+                activeColor = data.active_color ?? activeColor;
+
+                applyActiveColor(
+                    colorMap[activeColor] ?? '#F472B6'
+                );
+
+                setConnectionStatus(true);
+
+            } catch (error) {
+                console.error('Realtime dashboard error:', error);
+                setConnectionStatus(false);
+            }
+        }
+
+        // Inisialisasi dashboard.
+        document.addEventListener('DOMContentLoaded', function() {
+            updateProductUrl();
+
+            applyActiveColor(hexSaatIni);
+
+            renderQRCode();
+
+            refreshDashboard();
+
+            // Memperbarui data setiap 2 detik.
+            setInterval(refreshDashboard, 2000);
+        });
+    </script>
+
+</body>
+</html>
